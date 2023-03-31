@@ -1,11 +1,15 @@
+const path = require("path");
 const express = require("express");
 const bodyParser = require("body-parser");
+// kết nối db
+const mongoose = require("mongoose");
 
 const feedRoutes = require("./routes/feed");
 
 const app = express();
 
 app.use(bodyParser.json()); // application/json
+app.use("/images", express.static(path.join(__dirname, "images"))); // Để lấy tớI mục images
 
 // Cho phép truy cập vào API từ bất kì Clients nào CORS Error
 app.use((req, res, next) => {
@@ -20,4 +24,18 @@ app.use((req, res, next) => {
 
 app.use("/feed", feedRoutes);
 
-app.listen(8080);
+app.use((error, req, res, next) => {
+  console.log(error);
+  const status = error.statusCode || 500;
+  const message = error.message;
+  res.status(status).json({ message: message });
+});
+
+mongoose
+  .connect(
+    "mongodb+srv://TuanKhanh:B01888084955@cluster0.qwkbfqz.mongodb.net/messagesDb?retryWrites=true&w=majority"
+  )
+  .then((result) => {
+    app.listen(8080);
+  })
+  .catch((err) => console.log(err));

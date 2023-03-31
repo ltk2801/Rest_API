@@ -1,17 +1,82 @@
-exports.getPosts = (req, res, next) => {
-  res.status(200).json({
-    post: [{ title: "First Post", content: "This is the first post !" }],
-  });
-};
+const { validationResult } = require("express-validator");
 
+const Post = require("../models/post");
+
+// get posts
+exports.getPosts = (req, res, next) => {
+  Post.find()
+    .then((posts) => {
+      if (!posts) {
+        const error = new Error("Could not find post. ");
+        error.statusCode = 404;
+        throw error;
+      }
+      res
+        .status(200)
+        .json({ message: "Fetched posts successfully ", posts: posts });
+    })
+    .catch((err) => {
+      if (!err.statusCode) {
+        err.statusCode = 500;
+      }
+      next(err);
+    });
+};
+// post feed
 exports.postPost = (req, res, next) => {
+  // Bắt lỗi validation
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    const error = new Error("Validation failed, entered data is incorrect.");
+    error.statusCode = 422;
+    throw error;
+  }
   // Nhận dữ liệu gửi lên
   const title = req.body.title;
   const content = req.body.content;
 
-  // Create post in db
-  res.status(201).json({
-    message: "Post created successfully !",
-    post: { id: new Date().toISOString(), title: title, content: content },
+  const post = new Post({
+    title: title,
+    content: content,
+    imageUrl: "images/KimNgan.jpg",
+    creator: {
+      name: "Tuan Khanh",
+    },
   });
+  post
+    .save()
+    .then((result) => {
+      console.log(result);
+      // Create post in db
+      res.status(201).json({
+        message: "Post created successfully !",
+        post: result,
+      });
+    })
+    .catch((err) => {
+      if (!err.statusCode) {
+        err.statusCode = 500;
+      }
+      next(err);
+    });
+};
+
+// Get post
+exports.getPost = (req, res, next) => {
+  const postId = req.params.postId;
+  Post.findById(postId)
+    .then((post) => {
+      if (!post) {
+        const error = new Error("Could not find post. ");
+        error.statusCode = 404;
+        throw error;
+      }
+      res.status(200).json({ message: "Post fetched.", post: post });
+    })
+    .catch((err) => {
+      if (!err.statusCode) {
+        err.statusCode = 500;
+      }
+      next(err);
+    });
 };

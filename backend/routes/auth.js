@@ -5,6 +5,9 @@ const User = require("../models/user");
 const authController = require("../controllers/auth");
 const router = express.Router();
 
+// Sử dụng middleware
+const isAuth = require("../middleware/is-auth");
+
 // PUT // auth/signup
 router.put(
   "/signup",
@@ -28,5 +31,16 @@ router.put(
 
 // POST / auth/ login
 router.post("/login", authController.login);
+
+// GET / auth/status
+router.get("/status", isAuth, authController.getUserStatus);
+
+// PATCH / auth/status
+router.patch(
+  "/status",
+  isAuth,
+  [body("status").trim().not().isEmpty()],
+  authController.updateUserStatus
+);
 
 module.exports = router;

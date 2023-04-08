@@ -3,6 +3,7 @@ const path = require("path");
 
 const { validationResult } = require("express-validator");
 
+const io = require("../socket");
 const Post = require("../models/post");
 const User = require("../models/user");
 
@@ -16,6 +17,7 @@ exports.getPosts = async (req, res, next) => {
     // skip là bỏ qua số phần tử ở trước nó, limit là lấy ra đúng chừng đó tiếp theo
     const posts = await Post.find()
       .populate("creator")
+      .sort({ createdAt: -1 })
       .skip((currentPage - 1) * perPage)
       .limit(perPage);
     if (!posts) {
@@ -70,6 +72,11 @@ exports.postPost = async (req, res, next) => {
     // Create posts in userSchema
     user.posts.push(post);
     await user.save();
+    // Bắn lên trên server IO
+    io.getIO().emit("posts", {
+      action: "create",
+      post: { ...post._doc, creator: { _id: req.userId, name: user.name } },
+    });
     // Bắn API lên client
     res.status(201).json({
       message: "Post created successfully !",
@@ -94,7 +101,11 @@ exports.getPost = async (req, res, next) => {
       error.statusCode = 404;
       throw error;
     }
-    res.status(200).json({ message: "Post fetched.", post: post });
+    const user = await User.findById(post.creator.toString());
+
+    res
+      .status(200)
+      .json({ message: "Post fetched.", post: post, name: user.name });
   } catch (err) {
     if (!err.statusCode) {
       err.statusCode = 500;
@@ -128,14 +139,14 @@ exports.updatePost = async (req, res, next) => {
   }
 
   try {
-    const post = await Post.findById(postId);
+    const post = await Post.findById(postId).populate("creator"); // Để lấy thêm thông tin của craetor
     if (!post) {
       const error = new Error("Could not find post. ");
       error.statusCode = 404;
       throw error;
     }
     // kiểm tra xem bài post này có phải do user này đăng không thì mới có quyền chỉnh sửa
-    if (post.creator.toString() !== req.userId) {
+    if (post.creator._id.toString() !== req.userId) {
       const error = new Error("Not authorized!");
       error.statusCode = 403;
       throw error;
@@ -148,6 +159,8 @@ exports.updatePost = async (req, res, next) => {
     post.imageUrl = imageUrl;
     post.content = content;
     const result = await post.save();
+    // Bắn lên trên server IO
+    io.getIO().emit("posts", { action: "update", post: result });
     res.status(200).json({ message: "Post updated!", post: result });
   } catch (err) {
     if (!err.statusCode) {
@@ -178,6 +191,8 @@ exports.deletePost = async (req, res, next) => {
     // Xóa bài đăng trong User
     user.posts.pull(postId);
     await user.save();
+    // Bắn data lên socket IO
+    io.getIO().emit("posts", { action: "delete", post: postId });
     res.status(200).json({ message: "Deleted post !" });
   } catch (err) {
     if (!err.statusCode) {

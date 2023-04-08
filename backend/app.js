@@ -1,6 +1,8 @@
 const path = require("path");
 const express = require("express");
 const bodyParser = require("body-parser");
+const cors = require("cors");
+
 // kết nối db
 const mongoose = require("mongoose");
 // upload, download file
@@ -43,6 +45,8 @@ app.use(
 app.use("/images", express.static(path.join(__dirname, "images"))); // Để lấy tớI mục images
 
 // Cho phép truy cập vào API từ bất kì Clients nào CORS Error
+// Cấu hình cho phép CORS
+app.use(cors());
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader(
@@ -70,6 +74,10 @@ mongoose
     "mongodb+srv://TuanKhanh:B01888084955@cluster0.qwkbfqz.mongodb.net/messagesDb?retryWrites=true&w=majority"
   )
   .then((result) => {
-    app.listen(8080);
+    const server = app.listen(8080);
+    const io = require("./socket").init(server);
+    io.on("connection", (socket) => {
+      console.log("Client connected");
+    });
   })
   .catch((err) => console.log(err));
